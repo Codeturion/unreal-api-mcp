@@ -67,19 +67,20 @@ All Engine Runtime, Editor, Developer modules, plus built-in plugins (Enhanced I
 
 | Version | Records | Deprecated | Modules | DB Size |
 |---------|---------|------------|---------|---------|
-| UE 5.5 | 100,379 | 3,689 | 860 | 43 MB |
-| UE 5.6 | 110,467 | 4,205 | 981 | 48 MB |
+| UE 5.5 | 99,591 | 3,689 | 860 | 43 MB |
+| UE 5.6 | 109,530 | 4,205 | 981 | 48 MB |
+| UE 5.7 | 114,724 | 4,409 | 1,019 | 50 MB |
 
-Record breakdown (UE 5.6):
+Record breakdown (UE 5.7):
 
 | Type | Count | Source |
 |------|-------|--------|
-| Classes (UCLASS) | 9,789 | `AActor`, `ACharacter`, `UGameplayStatics`, ... |
-| Structs (USTRUCT) | 8,617 | `FHitResult`, `FVector`, `FTransform`, ... |
-| Enums (UENUM) | 3,327 | `EMovementMode`, `ECollisionChannel`, ... |
-| Functions (UFUNCTION) | 22,854 | Signatures with params, return types, specifiers |
-| Properties (UPROPERTY) | 63,478 | Types, specifiers, doc comments |
-| Delegates | 2,402 | Dynamic multicast, delegate declarations |
+| Classes (UCLASS) | 10,075 | `AActor`, `ACharacter`, `UGameplayStatics`, ... |
+| Structs (USTRUCT) | 9,014 | `FHitResult`, `FVector`, `FTransform`, ... |
+| Enums (UENUM) | 3,475 | `EMovementMode`, `ECollisionChannel`, ... |
+| Functions (UFUNCTION) | 23,414 | Signatures with params, return types, specifiers |
+| Properties (UPROPERTY) | 66,340 | Types, specifiers, doc comments |
+| Delegates | 2,406 | Dynamic multicast, delegate declarations |
 
 Does **not** cover third-party plugins or marketplace assets. For those, rely on project source.
 
@@ -109,7 +110,7 @@ Even in a realistic hybrid workflow where MCP results are followed up with targe
 <details>
 <summary>Query latency</summary>
 
-Measured on UE 5.6 database (110,467 records), 50 iterations per query:
+Measured on UE 5.7 database (114,724 records), 50 iterations per query:
 
 | Query | Median | p95 |
 |-------|--------|-----|

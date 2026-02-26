@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-**MCP server that gives AI agents accurate Unreal Engine C++ API documentation. Prevents hallucinated signatures, wrong `#include` paths, and deprecated API usage.**
+**MCP server that gives AI agents accurate Unreal Engine C++ API documentation. Saves tokens, context, and time — prevents hallucinated signatures, wrong `#include` paths, and deprecated API usage.**
 
 Supports **UE 5.5**, **5.6**, and **5.7** with separate databases for each version. Works with Claude Code, Cursor, Windsurf, or any MCP-compatible AI tool. No Unreal Engine installation required.
 

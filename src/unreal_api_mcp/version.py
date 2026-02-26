@@ -14,7 +14,7 @@ _CACHE_DIR = Path.home() / ".unreal-api-mcp"
 _GITHUB_RELEASE = (
     "https://github.com/Codeturion/unreal-api-mcp/releases/download/db-v1"
 )
-_SUPPORTED_VERSIONS = ("5.4", "5.5", "5.6", "5.7")
+_SUPPORTED_VERSIONS = ("5.5", "5.6", "5.7")
 _DEFAULT_VERSION = "5.7"
 
 

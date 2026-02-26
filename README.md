@@ -7,7 +7,7 @@
 
 **MCP server that gives AI agents accurate Unreal Engine C++ API documentation. Prevents hallucinated signatures, wrong `#include` paths, and deprecated API usage.**
 
-Supports **UE 5.4**, **5.5**, **5.6**, and **5.7** with separate databases for each version. Works with Claude Code, Cursor, Windsurf, or any MCP-compatible AI tool. No Unreal Engine installation required.
+Supports **UE 5.5**, **5.6**, and **5.7** with separate databases for each version. Works with Claude Code, Cursor, Windsurf, or any MCP-compatible AI tool. No Unreal Engine installation required.
 
 ## Quick Start
 
@@ -31,7 +31,7 @@ Add to your MCP config (`.mcp.json`, `mcp.json`, or your tool's MCP settings), s
 }
 ```
 
-Valid values: `"5.4"`, `"5.5"`, `"5.6"`, or `"5.7"`. On Windows, use `unreal-api-mcp.exe`.
+Valid values: `"5.5"`, `"5.6"`, or `"5.7"`. On Windows, use `unreal-api-mcp.exe`.
 
 On first run the server downloads the correct database (~43-48 MB) to `~/.unreal-api-mcp/`.
 

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Codeturion/unreal-api-mcp",
+  "title": "Unreal Engine API Documentation",
+  "description": "Accurate Unreal Engine C++ API docs (UE 5.4/5.5/5.6/5.7) for AI agents. Prevents hallucinated signatures, wrong #include paths, and deprecated API usage.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/Codeturion/unreal-api-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "unreal-api-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "UNREAL_VERSION",
+          "description": "Unreal Engine version to serve: 5.4, 5.5, 5.6, or 5.7 (default: auto-detect or 5.7)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "UNREAL_PROJECT_PATH",
+          "description": "Path to Unreal project for auto-detecting version from .uproject EngineAssociation field",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

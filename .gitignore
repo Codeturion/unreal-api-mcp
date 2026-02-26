@@ -1,0 +1,13 @@
+venv/
+mcp-publisher.exe
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+dist/
+build/
+/data/
+src/unreal_api_mcp/data/*.db
+.idea
+.claude/settings.local.json
+ROADMAP.md

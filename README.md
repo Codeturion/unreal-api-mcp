@@ -103,12 +103,9 @@ Even in a realistic hybrid workflow where MCP results are followed up with targe
 
 "Without MCP" estimates assume full or partial file reads. A skilled agent with good tooling may use fewer tokens than shown. What MCP guarantees is a correct, structured answer in one call every time.
 
-<details>
-<summary>Per-question breakdown</summary>
+### Per-question breakdown
 
 ![Token Cost Per Question](https://raw.githubusercontent.com/Codeturion/unreal-api-mcp/master/docs/images/02-per-step.png)
-
-</details>
 
 <details>
 <summary>Query latency</summary>

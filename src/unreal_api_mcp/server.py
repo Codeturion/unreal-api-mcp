@@ -111,9 +111,9 @@ def _format_record(r: dict[str, Any]) -> str:
     if r.get("deprecated"):
         hint = r.get("deprecation_hint", "")
         if hint:
-            lines.append(f"  ⚠ DEPRECATED: {hint}")
+            lines.append(f"  DEPRECATED: {hint}")
         else:
-            lines.append("  ⚠ DEPRECATED")
+            lines.append("  DEPRECATED")
 
     return "\n".join(lines)
 

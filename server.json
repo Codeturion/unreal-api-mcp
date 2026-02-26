@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.Codeturion/unreal-api-mcp",
   "title": "Unreal Engine API Documentation",
-  "description": "Accurate Unreal Engine C++ API docs (UE 5.5/5.6/5.7) for AI agents. Prevents hallucinated signatures, wrong #include paths, and deprecated API usage.",
+  "description": "Accurate UE5 C++ API docs for AI agents. Prevents hallucinated signatures and includes.",
   "version": "0.1.0",
   "repository": {
     "url": "https://github.com/Codeturion/unreal-api-mcp",

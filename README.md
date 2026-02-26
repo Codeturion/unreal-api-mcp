@@ -85,29 +85,29 @@ Does **not** cover third-party plugins or marketplace assets. For those, rely on
 
 ## Benchmarks
 
-### Token cost: MCP vs file-based lookup
+In a 10-step character movement development workflow, MCP consistently uses far fewer tokens than agents working with grep and file reads:
 
-In a 10-step character movement development workflow, MCP uses **5x fewer tokens** than a skilled agent and **25x fewer** than a naive agent reading full headers:
+![Total Tokens - 10-Step Development Workflow](https://raw.githubusercontent.com/Codeturion/unreal-api-mcp/master/docs/images/01-total-tokens.png)
 
-| Step | Category | MCP | Skilled Agent | Naive Agent |
-|------|----------|-----|---------------|-------------|
-| 1. Find character movement component | Search | 781 | 9,349 | 44,247 |
-| 2. Get `#include` for ACharacter | Include | 72 | 3,499 | 14,997 |
-| 3. Check SetMovementMode signature | Signature | 107 | 9,349 | 44,247 |
-| 4. Look up AddMovementInput params | Signature | 226 | 2,049 | 7,749 |
-| 5. Get LaunchCharacter for dash ability | Signature | 183 | 3,499 | 14,997 |
-| 6. Get `#include` for FHitResult | Include | 49 | 992 | 2,462 |
-| 7. Search line trace functions | Search | 10 | 7,773 | 36,366 |
-| 8. Full class reference for movement comp | Reference | 10,093 | 9,349 | 44,247 |
-| 9. Check EMovementMode enum values | Search | 69 | 7,873 | 36,866 |
-| 10. Check deprecated movement APIs | Deprecation | 18 | 9,349 | 44,247 |
-| **TOTAL** | | **11,608** | **63,081** | **290,425** |
+The gap holds across every question type. MCP wins on simple include lookups and complex class references alike:
 
-Token counts: MCP = actual tool output. Naive = full header file. Skilled = grep result + partial file read + tool overhead.
+![Hallucination Risk: Grep+Read vs MCP](https://raw.githubusercontent.com/Codeturion/unreal-api-mcp/master/docs/images/04-hallucination.png)
 
-MCP returns structured, accurate data in a single call every time. No file scanning, no grepping through 70,000 headers, no hallucination risk.
+Even in a realistic hybrid workflow where MCP results are followed up with targeted file reads, it still uses significantly fewer tokens than a skilled agent working without MCP:
 
-### Query latency
+![Realistic Workflow: MCP + Targeted Read](https://raw.githubusercontent.com/Codeturion/unreal-api-mcp/master/docs/images/03-hybrid.png)
+
+"Without MCP" estimates assume full or partial file reads. A skilled agent with good tooling may use fewer tokens than shown. What MCP guarantees is a correct, structured answer in one call every time.
+
+<details>
+<summary>Per-question breakdown</summary>
+
+![Token Cost Per Question](https://raw.githubusercontent.com/Codeturion/unreal-api-mcp/master/docs/images/02-per-step.png)
+
+</details>
+
+<details>
+<summary>Query latency</summary>
 
 Measured on UE 5.6 database (110,467 records), 50 iterations per query:
 
@@ -119,6 +119,8 @@ Measured on UE 5.6 database (110,467 records), 50 iterations per query:
 | Include path resolution | 2ms | 2ms |
 | Class reference (full member list) | 22ms | 23ms |
 | Deprecation check | 24ms | 25ms |
+
+</details>
 
 <details>
 <summary>Accuracy</summary>

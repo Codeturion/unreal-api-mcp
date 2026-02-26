@@ -3,7 +3,7 @@
   "name": "io.github.Codeturion/unreal-api-mcp",
   "title": "Unreal Engine API Documentation",
   "description": "Accurate UE5 C++ API docs for AI agents. Prevents hallucinated signatures and includes.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "url": "https://github.com/Codeturion/unreal-api-mcp",
     "source": "github"
@@ -12,7 +12,7 @@
     {
       "registryType": "pypi",
       "identifier": "unreal-api-mcp",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

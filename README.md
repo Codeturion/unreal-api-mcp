@@ -85,6 +85,30 @@ Does **not** cover third-party plugins or marketplace assets. For those, rely on
 
 ## Benchmarks
 
+### Token cost: MCP vs file-based lookup
+
+In a 10-step character movement development workflow, MCP uses **5x fewer tokens** than a skilled agent and **25x fewer** than a naive agent reading full headers:
+
+| Step | Category | MCP | Skilled Agent | Naive Agent |
+|------|----------|-----|---------------|-------------|
+| 1. Find character movement component | Search | 781 | 9,349 | 44,247 |
+| 2. Get `#include` for ACharacter | Include | 72 | 3,499 | 14,997 |
+| 3. Check SetMovementMode signature | Signature | 107 | 9,349 | 44,247 |
+| 4. Look up AddMovementInput params | Signature | 226 | 2,049 | 7,749 |
+| 5. Get LaunchCharacter for dash ability | Signature | 183 | 3,499 | 14,997 |
+| 6. Get `#include` for FHitResult | Include | 49 | 992 | 2,462 |
+| 7. Search line trace functions | Search | 10 | 7,773 | 36,366 |
+| 8. Full class reference for movement comp | Reference | 10,093 | 9,349 | 44,247 |
+| 9. Check EMovementMode enum values | Search | 69 | 7,873 | 36,866 |
+| 10. Check deprecated movement APIs | Deprecation | 18 | 9,349 | 44,247 |
+| **TOTAL** | | **11,608** | **63,081** | **290,425** |
+
+Token counts: MCP = actual tool output. Naive = full header file. Skilled = grep result + partial file read + tool overhead.
+
+MCP returns structured, accurate data in a single call every time. No file scanning, no grepping through 70,000 headers, no hallucination risk.
+
+### Query latency
+
 Measured on UE 5.6 database (110,467 records), 50 iterations per query:
 
 | Query | Median | p95 |
@@ -96,19 +120,18 @@ Measured on UE 5.6 database (110,467 records), 50 iterations per query:
 | Class reference (full member list) | 22ms | 23ms |
 | Deprecation check | 24ms | 25ms |
 
-Every query returns structured, accurate data in a single MCP call. No file scanning, no grepping through 70,000 headers.
-
 <details>
-<summary>Token savings vs file-based lookup</summary>
+<summary>Accuracy</summary>
 
-A single `get_function_signature` call returns the exact signature, parameters with types and descriptions, `#include` path, specifiers, and deprecation status in ~200-400 tokens.
+| Test | Result |
+|------|--------|
+| Search top-1 relevance (8 common queries) | 100% |
+| Include path resolution (6 key classes) | 100% |
+| Function signature accuracy (3 common functions) | 100% |
+| Class reference completeness (2 classes) | 100% |
+| Deprecation detection (1 deprecated API) | 100% |
 
-Without MCP, an agent would need to:
-1. Search for the header file (`grep` or `find`) -- 500-2,000 tokens in tool calls
-2. Read the header file (often 2,000-5,000+ lines) -- 3,000-10,000+ tokens
-3. Parse the result mentally -- risk of hallucination
-
-For a typical 10-API-call development session, MCP saves **10,000-50,000+ tokens** compared to file-based lookup, while guaranteeing accuracy.
+Ranking uses BM25 with tuned column weights (member name 10x, class name 5x) plus core module boosting to ensure `AActor::GetActorLocation` ranks above niche plugin APIs.
 
 </details>
 

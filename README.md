@@ -16,18 +16,14 @@ Supports **UE 5.5**, **5.6**, and **5.7** with separate databases for each versi
 
 ## Quick Start
 
-```bash
-pip install unreal-api-mcp
-```
-
 Add to your MCP config (`.mcp.json`, `mcp.json`, or your tool's MCP settings), setting `UNREAL_VERSION` to match your project:
 
 ```json
 {
   "mcpServers": {
     "unreal-api": {
-      "command": "unreal-api-mcp",
-      "args": [],
+      "command": "uvx",
+      "args": ["unreal-api-mcp"],
       "env": {
         "UNREAL_VERSION": "5.5"
       }
@@ -36,7 +32,7 @@ Add to your MCP config (`.mcp.json`, `mcp.json`, or your tool's MCP settings), s
 }
 ```
 
-Valid values: `"5.5"`, `"5.6"`, or `"5.7"`. On Windows, use `unreal-api-mcp.exe`.
+Valid values: `"5.5"`, `"5.6"`, or `"5.7"`.
 
 On first run the server downloads the correct database (~43-48 MB) to `~/.unreal-api-mcp/`.
 
@@ -175,10 +171,33 @@ Instead of setting `UNREAL_VERSION`, you can point to your Unreal project. The s
 {
   "mcpServers": {
     "unreal-api": {
+      "command": "uvx",
+      "args": ["unreal-api-mcp"],
+      "env": {
+        "UNREAL_PROJECT_PATH": "F:/Unreal Projects/MyProject"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Alternative installation methods</summary>
+
+**Using pip install:**
+```bash
+pip install unreal-api-mcp
+```
+```json
+{
+  "mcpServers": {
+    "unreal-api": {
       "command": "unreal-api-mcp",
       "args": [],
       "env": {
-        "UNREAL_PROJECT_PATH": "F:/Unreal Projects/MyProject"
+        "UNREAL_VERSION": "5.5"
       }
     }
   }

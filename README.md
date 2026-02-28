@@ -2,9 +2,11 @@
 
 <!-- mcp-name: io.github.Codeturion/unreal-api-mcp -->
 
-[![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/servers/io.github.Codeturion/unreal-api-mcp)
 [![PyPI Version](https://img.shields.io/pypi/v/unreal-api-mcp.svg)](https://pypi.org/project/unreal-api-mcp/)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/unreal-api-mcp.svg)](https://pypi.org/project/unreal-api-mcp/)
+[![MCP Registry](https://img.shields.io/badge/MCP-Registry-green)](https://registry.modelcontextprotocol.io/?q=unreal-api-mcp)
+[![GitHub Stars](https://img.shields.io/github/stars/Codeturion/unreal-api-mcp)](https://github.com/Codeturion/unreal-api-mcp)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/Codeturion/unreal-api-mcp)](https://github.com/Codeturion/unreal-api-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 

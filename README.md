@@ -274,4 +274,7 @@ fuatcankoseoglu@gmail.com
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/) — free for personal and non-commercial use. For commercial licensing, contact fuatcankoseoglu@gmail.com.
+[PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)
+
+Free to use, fork, modify, and share for any personal or non-commercial purpose.
+Commercial use requires permission — contact fuatcankoseoglu@gmail.com.

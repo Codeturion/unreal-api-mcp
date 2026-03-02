@@ -25,34 +25,43 @@ jobs:
           all_tags=$(GH_TOKEN="$UE_PAT" gh api repos/EpicGames/UnrealEngine/tags \
             --paginate -q '.[].name')
 
-          # Extract unique major.minor versions from release tags (e.g. 5.7.3-release -> 5.7)
-          ue_versions=$(echo "$all_tags" \
-            | grep -oE '^[0-9]+\.[0-9]+' \
-            | sort -Vu)
-          echo "UE versions found: $ue_versions"
+          # Extract all release tags (e.g. 5.7.3-release, 5.5.4-release)
+          release_tags=$(echo "$all_tags" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+-release$')
+
+          # Build list of all versions to check:
+          #   - Patch versions: 5.7.3, 5.7.2, 5.5.4, etc.
+          #   - Major.minor versions: 5.7, 5.5, etc. (built from latest patch)
+          patch_versions=$(echo "$release_tags" | sed 's/-release$//' | sort -Vu)
+          major_minor_versions=$(echo "$patch_versions" | grep -oE '^[0-9]+\.[0-9]+' | sort -Vu)
+          all_versions=$(printf '%s\n%s\n' "$major_minor_versions" "$patch_versions" | sort -Vu)
+          echo "Versions to check: $all_versions"
 
           # Fetch existing DB assets once (not per iteration)
           existing=$(gh release view db-v1 --json assets -q '.assets[].name' 2>/dev/null || echo "")
           echo "Existing DBs: $existing"
 
-          # For each version, find the latest release tag
-          for version in $ue_versions; do
-            latest_tag=$(echo "$all_tags" \
-              | grep -E "^${version}\.[0-9]+-release$" \
-              | sort -V | tail -1)
-
-            # Skip versions with no release tag (only previews)
-            if [ -z "$latest_tag" ]; then
-              echo "  $version: no release tag, skipping"
-              continue
+          for version in $all_versions; do
+            # Determine the tag for this version
+            if echo "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              # Patch version (5.7.3) -> exact tag
+              tag="${version}-release"
+            else
+              # Major.minor (5.7) -> latest patch tag
+              tag=$(echo "$release_tags" \
+                | grep -E "^${version}\.[0-9]+-release$" \
+                | sort -V | tail -1)
+              if [ -z "$tag" ]; then
+                echo "  $version: no release tag, skipping"
+                continue
+              fi
             fi
 
             db_name="unreal_docs_${version}.db"
 
             if echo "$existing" | grep -qF "$db_name"; then
-              echo "  $version: OK ($db_name exists, latest tag: $latest_tag)"
+              echo "  $version: OK ($db_name exists, tag: $tag)"
             else
-              echo "  $version: NEW (latest tag: $latest_tag)"
+              echo "  $version: NEW (tag: $tag)"
 
               # Don't create duplicate issues
               open=$(gh issue list \
@@ -63,17 +72,17 @@ jobs:
                 gh issue create \
                   --title "New UE version detected: $version" \
                   --body "$(cat <<EOF
-          New Unreal Engine version \`$version\` found (latest tag: \`$latest_tag\`).
+          New Unreal Engine version \`$version\` found (tag: \`$tag\`).
 
           **To build the database:**
-          1. Go to **Actions** → **Build UE Database**
+          1. Go to **Actions** -> **Build UE Database**
           2. Click **Run workflow**
           3. Set \`ue_version\` to \`$version\`
-          4. Leave \`ue_tag\` empty (auto-detects \`$latest_tag\`)
+          4. Leave \`ue_tag\` empty (auto-detects \`$tag\`)
 
           **After the DB is built:**
           - Confirm \`unreal_docs_${version}.db\` appears in the \`db-v1\` release
-          - Update \`_DEFAULT_VERSION\` in \`src/unreal_api_mcp/version.py\` if this is the new latest
+          - If this is a new major.minor, update \`_DEFAULT_VERSION\` in \`version.py\`
           - Update the README coverage table
           - Bump the package version and publish
           EOF

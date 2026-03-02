@@ -13,3 +13,4 @@ src/unreal_api_mcp/data/*.db
 ROADMAP.md
 CLAUDE.md
 docs/generate_charts.py
+CIWorkflow.md

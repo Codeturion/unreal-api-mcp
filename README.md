@@ -12,7 +12,7 @@
 
 **MCP server that gives AI agents accurate Unreal Engine C++ API documentation. Saves tokens, context, and time — prevents hallucinated signatures, wrong `#include` paths, and deprecated API usage.**
 
-Supports **UE 5.5**, **5.6**, and **5.7** with separate databases for each version. Works with Claude Code, Cursor, Windsurf, or any MCP-compatible AI tool. No Unreal Engine installation required.
+Supports **every UE 5.x release** (5.0 through 5.7) with separate databases for each version and patch. Works with Claude Code, Cursor, Windsurf, or any MCP-compatible AI tool. No Unreal Engine installation required. New versions detected and built automatically every week.
 
 ## Quick Start
 
@@ -32,9 +32,9 @@ Add to your MCP config (`.mcp.json`, `mcp.json`, or your tool's MCP settings), s
 }
 ```
 
-Valid values: `"5.5"`, `"5.6"`, or `"5.7"`.
+Valid values: `"5.0"` through `"5.7"`, or any patch version like `"5.7.3"`.
 
-On first run the server downloads the correct database (~43-48 MB) to `~/.unreal-api-mcp/`.
+On first run the server downloads the correct database (~26-50 MB depending on version) to `~/.unreal-api-mcp/`. Patch versions (e.g. `"5.7.3"`) fall back to the major.minor database (e.g. `"5.7"`) if a patch-specific one isn't available.
 
 ## How It Works
 
@@ -42,11 +42,11 @@ On first run the server downloads the correct database (~43-48 MB) to `~/.unreal
 
 | Priority | Source | Example |
 |----------|--------|---------|
-| 1 | `UNREAL_VERSION` env var | `"5.5"`, `"5.6"`, `"5.7"` |
-| 2 | `UNREAL_PROJECT_PATH` | Reads `.uproject` `EngineAssociation` field, maps `5.5.1` to `"5.5"` |
+| 1 | `UNREAL_VERSION` env var | `"5.5"`, `"5.7"`, `"5.7.3"` |
+| 2 | `UNREAL_PROJECT_PATH` | Reads `.uproject` `EngineAssociation` field (e.g. `5.5.1` or `5.7`) |
 | 3 | Default | `"5.7"` |
 
-2. **Database download.** If the database for that version isn't cached locally, it downloads from GitHub (one time).
+2. **Database download.** If the database for that version isn't cached locally, it downloads from GitHub (one time). For patch versions, falls back to the major.minor database if needed. Also checks for updates on startup.
 
 3. **Serve.** All tool calls query the version-specific SQLite database. Exact lookups return in <1ms, searches in <5ms.
 
@@ -68,11 +68,18 @@ All Engine Runtime, Editor, Developer modules, plus built-in plugins (Enhanced I
 
 Includes Blueprint graph internals: **158 UK2Node subclasses**, `UEdGraphSchema_K2`, `BlueprintGraph`, `KismetCompiler`, and `GraphEditor` modules (1,120+ entries). If you're writing custom K2 nodes or editor tooling, it's indexed.
 
-| Version | Records | Deprecated | Modules | DB Size |
-|---------|---------|------------|---------|---------|
-| UE 5.5 | 99,591 | 3,689 | 860 | 43 MB |
-| UE 5.6 | 109,530 | 4,205 | 981 | 48 MB |
-| UE 5.7 | 114,724 | 4,409 | 1,019 | 50 MB |
+| Version | Patches | DB Size |
+|---------|---------|---------|
+| UE 5.0 | 5.0.0 - 5.0.3 | ~26 MB |
+| UE 5.1 | 5.1.0 - 5.1.1 | ~30 MB |
+| UE 5.2 | 5.2.0 - 5.2.1 | ~32 MB |
+| UE 5.3 | 5.3.0 - 5.3.2 | ~35 MB |
+| UE 5.4 | 5.4.0 - 5.4.4 | ~40 MB |
+| UE 5.5 | 5.5.0 - 5.5.4 | ~43 MB |
+| UE 5.6 | 5.6.0 - 5.6.1 | ~48 MB |
+| UE 5.7 | 5.7.0 - 5.7.3 | ~50 MB |
+
+**35 databases** total. New versions detected and built automatically every Monday via CI.
 
 Record breakdown (UE 5.7):
 
@@ -214,7 +221,7 @@ pip install unreal-api-mcp
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
-| `UNREAL_VERSION` | UE version to serve | `5.5`, `5.6`, `5.7` |
+| `UNREAL_VERSION` | UE version to serve | `5.5`, `5.7`, `5.7.3` |
 | `UNREAL_PROJECT_PATH` | Auto-detect version from .uproject | `F:/Unreal Projects/MyProject` |
 | `UNREAL_INSTALL_PATH` | Override UE install path (for `ingest` only) | `H:/UE_5.6` |
 

@@ -106,7 +106,7 @@ jobs:
           python -c "
           import sqlite3
           conn = sqlite3.connect('$DB')
-          count = conn.execute('SELECT COUNT(*) FROM entries').fetchone()[0]
+          count = conn.execute('SELECT COUNT(*) FROM api_records').fetchone()[0]
           print(f'Record count: {count}')
           conn.close()
           "

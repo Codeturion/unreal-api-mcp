@@ -150,8 +150,9 @@ jobs:
           done
 
           total=$(echo "$assets" | wc -l)
+          updated=$(date -u +"%Y-%m-%d")
 
-          gh release edit db-v1 --notes "$(cat <<EOF
+          gh release edit db-v1 --title "Pre-built Databases" --notes "$(cat <<EOF
           Pre-built SQLite databases for Unreal Engine API documentation. Downloaded automatically on first run.
 
           ## Supported Versions
@@ -161,5 +162,7 @@ jobs:
           **${total} databases** covering every UE 5.x release. Updated automatically via CI.
 
           Each major.minor database (e.g. \`5.7\`) is built from the latest patch tag. Patch databases (e.g. \`5.7.3\`) are built from the exact release tag.
+
+          *Last updated: ${updated}*
           EOF
           )"

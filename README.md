@@ -68,18 +68,7 @@ All Engine Runtime, Editor, Developer modules, plus built-in plugins (Enhanced I
 
 Includes Blueprint graph internals: **158 UK2Node subclasses**, `UEdGraphSchema_K2`, `BlueprintGraph`, `KismetCompiler`, and `GraphEditor` modules (1,120+ entries). If you're writing custom K2 nodes or editor tooling, it's indexed.
 
-| Version | Patches | DB Size |
-|---------|---------|---------|
-| UE 5.0 | 5.0.0 - 5.0.3 | ~26 MB |
-| UE 5.1 | 5.1.0 - 5.1.1 | ~30 MB |
-| UE 5.2 | 5.2.0 - 5.2.1 | ~32 MB |
-| UE 5.3 | 5.3.0 - 5.3.2 | ~35 MB |
-| UE 5.4 | 5.4.0 - 5.4.4 | ~40 MB |
-| UE 5.5 | 5.5.0 - 5.5.4 | ~43 MB |
-| UE 5.6 | 5.6.0 - 5.6.1 | ~48 MB |
-| UE 5.7 | 5.7.0 - 5.7.3 | ~50 MB |
-
-**35 databases** total. New versions detected and built automatically every Monday via CI.
+See the full list of supported versions and databases on the [**db-v1 release page**](https://github.com/Codeturion/unreal-api-mcp/releases/tag/db-v1). New versions are detected and built automatically every Monday via CI.
 
 Record breakdown (UE 5.7):
 

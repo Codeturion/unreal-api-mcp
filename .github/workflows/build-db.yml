@@ -109,3 +109,57 @@ jobs:
             --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update release description
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get all assets and build a summary table
+          assets=$(gh release view db-v1 --json assets -q '.assets[].name' | sort -V)
+
+          # Extract major.minor versions
+          majors=$(echo "$assets" \
+            | grep -oE 'unreal_docs_[0-9]+\.[0-9]+\.db' \
+            | sed 's/unreal_docs_//;s/\.db//' | sort -V)
+
+          table="| Version | Patches | DB Size |"
+          table="$table
+          |---------|---------|---------|"
+
+          for mm in $majors; do
+            # Find patch DBs for this major.minor
+            patches=$(echo "$assets" \
+              | grep -oE "unreal_docs_${mm}\.[0-9]+\.db" \
+              | sed 's/unreal_docs_//;s/\.db//' | sort -V)
+
+            if [ -n "$patches" ]; then
+              first=$(echo "$patches" | head -1)
+              last=$(echo "$patches" | tail -1)
+              patch_range="$first - $last"
+            else
+              patch_range="--"
+            fi
+
+            # Get size of the major.minor DB
+            size=$(gh release view db-v1 --json assets \
+              -q ".assets[] | select(.name == \"unreal_docs_${mm}.db\") | .size" 2>/dev/null)
+            size_mb=$(echo "scale=0; $size / 1024 / 1024" | bc 2>/dev/null || echo "?")
+
+            table="$table
+          | **$mm** | $patch_range | ~${size_mb} MB |"
+          done
+
+          total=$(echo "$assets" | wc -l)
+
+          gh release edit db-v1 --notes "$(cat <<EOF
+          Pre-built SQLite databases for Unreal Engine API documentation. Downloaded automatically on first run.
+
+          ## Supported Versions
+
+          $table
+
+          **${total} databases** covering every UE 5.x release. Updated automatically via CI.
+
+          Each major.minor database (e.g. \`5.7\`) is built from the latest patch tag. Patch databases (e.g. \`5.7.3\`) are built from the exact release tag.
+          EOF
+          )"

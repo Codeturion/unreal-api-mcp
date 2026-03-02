@@ -56,15 +56,17 @@ Each version has its own database with the correct signatures, deprecation warni
 
 | Tool | Purpose | Example |
 |------|---------|---------|
-| `search_unreal_api` | Find APIs by keyword | "character movement", "spawn actor" |
+| `search_unreal_api` | Find APIs by keyword | "character movement", "spawn actor", "K2Node" |
 | `get_function_signature` | Exact signature with parameters and return type | `AActor::GetActorLocation` |
 | `get_include_path` | Resolve `#include` for a type | "ACharacter" -> `#include "GameFramework/Character.h"` |
-| `get_class_reference` | Full class reference card | "APlayerController" -> all functions/properties/delegates |
+| `get_class_reference` | Full class reference card | "APlayerController", "UK2Node_SpawnActorFromClass", "UEdGraphSchema_K2" |
 | `get_deprecation_warnings` | Check if an API is obsolete | "K2_AttachRootComponentTo" -> Use AttachToComponent() instead |
 
 ## Coverage
 
 All Engine Runtime, Editor, Developer modules, plus built-in plugins (Enhanced Input, Gameplay Abilities, Common UI, Niagara, Chaos, and hundreds more).
+
+Includes Blueprint graph internals: **158 UK2Node subclasses**, `UEdGraphSchema_K2`, `BlueprintGraph`, `KismetCompiler`, and `GraphEditor` modules (1,120+ entries). If you're writing custom K2 nodes or editor tooling, it's indexed.
 
 | Version | Records | Deprecated | Modules | DB Size |
 |---------|---------|------------|---------|---------|
@@ -152,11 +154,12 @@ Use the `unreal-api` MCP tools to verify UE C++ API usage instead of guessing. *
 | Want to see all members on a class | `get_class_reference` | `get_class_reference("UCharacterMovementComponent")` |
 | Searching for an API by keyword | `search_unreal_api` | `search_unreal_api("spawn actor")` |
 | Checking if an API is deprecated | `get_deprecation_warnings` | `get_deprecation_warnings("K2_AttachRootComponentTo")` |
+| Writing custom K2 nodes or editor tools | `get_class_reference` | `get_class_reference("UK2Node_SpawnActorFromClass")`, `get_class_reference("UEdGraphSchema_K2")` |
 
 **Rules:**
 - Before writing a UE API call you haven't used in this conversation, verify the signature with `get_function_signature`
 - Before adding a `#include`, verify with `get_include_path` if unsure
-- Covers: all Engine Runtime/Editor modules, built-in plugins (Enhanced Input, GAS, CommonUI, Niagara, etc.)
+- Covers: all Engine Runtime/Editor modules, built-in plugins (Enhanced Input, GAS, CommonUI, Niagara, etc.), Blueprint graph internals (UK2Node subclasses, EdGraphSchema, BlueprintGraph, KismetCompiler)
 - Does NOT cover: third-party plugins or marketplace assets
 ```
 

@@ -72,9 +72,10 @@ jobs:
           4. Leave \`ue_tag\` empty (auto-detects \`$latest_tag\`)
 
           **After the DB is built:**
+          - Confirm \`unreal_docs_${version}.db\` appears in the \`db-v1\` release
           - Update \`_DEFAULT_VERSION\` in \`src/unreal_api_mcp/version.py\` if this is the new latest
-          - Update README coverage table
-          - Bump version and publish
+          - Update the README coverage table
+          - Bump the package version and publish
           EOF
                 )"
                 echo "  Created issue for $version"

@@ -13,12 +13,19 @@ jobs:
         id: list
         run: |
           # Get all DB assets from the db-v1 release, extract version numbers
-          versions=$(gh release view db-v1 \
+          asset_names=$(gh release view db-v1 \
             --repo "${{ github.repository }}" \
-            --json assets -q '.assets[].name' \
-            | grep -oE 'unreal_docs_[0-9.]+\.db$' | sed 's/unreal_docs_//;s/\.db//' \
-            | sort -V \
-            | jq -R . | jq -sc .)
+            --json assets -q '.assets[].name' 2>/dev/null || echo "")
+
+          if [ -z "$asset_names" ]; then
+            echo "No db-v1 release or no assets found."
+            versions="[]"
+          else
+            versions=$(printf '%s\n' "$asset_names" \
+              | grep -oE 'unreal_docs_[0-9.]+\.db$' | sed 's/unreal_docs_//;s/\.db//' \
+              | sort -V \
+              | jq -R . | jq -sc .)
+          fi
           echo "versions=$versions" >> "$GITHUB_OUTPUT"
           echo "Found versions: $versions"
         env:

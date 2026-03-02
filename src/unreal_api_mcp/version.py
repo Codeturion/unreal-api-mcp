@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -180,14 +181,31 @@ def ensure_db(version: str | None = None) -> Path:
             size_mb = path.stat().st_size / 1024 / 1024
             print(f"  Downloaded {size_mb:.1f} MB -> {path}", file=sys.stderr)
             return path
-        except Exception:
+        except urllib.error.HTTPError as exc:
             tmp.unlink(missing_ok=True)
-            if v != candidates[-1]:
+            if exc.code == 404 and v != candidates[-1]:
                 print(f"  Not found, trying fallback...", file=sys.stderr)
+                continue
+            raise RuntimeError(
+                f"Failed to download database for UE {v}.\n"
+                f"URL: {url}\n"
+                f"HTTP {exc.code}: {exc.reason}\n\n"
+                f"If you're building databases locally, run:\n"
+                f"  python -m unreal_api_mcp.ingest --unreal-version {version}"
+            ) from exc
+        except Exception as exc:
+            tmp.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Failed to download database for UE {v}.\n"
+                f"URL: {url}\n"
+                f"Error: {exc}\n\n"
+                f"If you're building databases locally, run:\n"
+                f"  python -m unreal_api_mcp.ingest --unreal-version {version}"
+            ) from exc
 
-    # All candidates failed.
+    # All candidates returned 404.
     raise RuntimeError(
-        f"Failed to download database for UE {version}.\n"
+        f"No database found for UE {version}.\n"
         f"Tried: {', '.join(f'unreal_docs_{v}.db' for v in candidates)}\n"
         f"URL base: {_GITHUB_RELEASE}\n\n"
         f"If you're building databases locally, run:\n"

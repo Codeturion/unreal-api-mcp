@@ -198,8 +198,8 @@ def read_uproject_version(project_path: str | Path) -> str | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         assoc = data.get("EngineAssociation", "")
-        # EngineAssociation is like "5.5" or a GUID for source builds.
-        m = re.match(r"^(\d+\.\d+)", assoc)
+        # EngineAssociation is like "5.5", "5.7.3", or a GUID for source builds.
+        m = re.match(r"^(\d+\.\d+(?:\.\d+)*)", assoc)
         return m.group(1) if m else None
     except (json.JSONDecodeError, OSError):
         return None

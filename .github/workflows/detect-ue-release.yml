@@ -1,0 +1,83 @@
+name: Detect New UE Release
+
+on:
+  schedule:
+    - cron: "0 12 * * 1" # Every Monday at noon UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Check for new UE versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UE_PAT: ${{ secrets.UE_SOURCE_PAT }}
+        run: |
+          # Fetch all tags from EpicGames/UnrealEngine (private repo)
+          echo "Fetching tags from EpicGames/UnrealEngine..."
+          all_tags=$(GH_TOKEN="$UE_PAT" gh api repos/EpicGames/UnrealEngine/tags \
+            --paginate -q '.[].name')
+
+          # Extract unique major.minor versions from release tags (e.g. 5.7.3-release -> 5.7)
+          ue_versions=$(echo "$all_tags" \
+            | grep -oP '^\d+\.\d+' \
+            | sort -Vu)
+          echo "UE versions found: $ue_versions"
+
+          # For each version, find the latest release tag
+          for version in $ue_versions; do
+            latest_tag=$(echo "$all_tags" \
+              | grep -E "^${version}\.[0-9]+-release$" \
+              | sort -V | tail -1)
+
+            # Skip versions with no release tag (only previews)
+            if [ -z "$latest_tag" ]; then
+              echo "  $version: no release tag, skipping"
+              continue
+            fi
+
+            # Check if we already have a DB for this version
+            db_name="unreal_docs_${version}.db"
+            existing=$(gh release view db-v1 --json assets -q '.assets[].name' 2>/dev/null || echo "")
+
+            if echo "$existing" | grep -qF "$db_name"; then
+              echo "  $version: OK ($db_name exists, latest tag: $latest_tag)"
+            else
+              echo "  $version: NEW (latest tag: $latest_tag)"
+
+              # Don't create duplicate issues
+              open=$(gh issue list \
+                --search "New UE version detected: $version in:title" \
+                --state open --json number -q 'length')
+
+              if [ "$open" = "0" ]; then
+                gh issue create \
+                  --title "New UE version detected: $version" \
+                  --body "$(cat <<EOF
+          New Unreal Engine version \`$version\` found (latest tag: \`$latest_tag\`).
+
+          **To build the database:**
+          1. Go to **Actions** → **Build UE Database**
+          2. Click **Run workflow**
+          3. Set \`ue_version\` to \`$version\`
+          4. Leave \`ue_tag\` empty (auto-detects \`$latest_tag\`)
+
+          **After the DB is built:**
+          - Update \`_SUPPORTED_VERSIONS\` in \`src/unreal_api_mcp/version.py\`
+          - Update README coverage table
+          - Bump version and publish
+          EOF
+                )"
+                echo "  Created issue for $version"
+              else
+                echo "  Issue already exists for $version"
+              fi
+            fi
+          done

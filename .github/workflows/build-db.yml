@@ -1,0 +1,105 @@
+name: Build UE Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      ue_version:
+        description: "UE version to build (e.g. 5.5, 5.6, 5.7)"
+        required: true
+        type: string
+      ue_tag:
+        description: "Tag on EpicGames/UnrealEngine (e.g. 5.7.3-release). Leave empty to auto-detect latest."
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Resolve UE tag
+        id: tag
+        env:
+          UE_PAT: ${{ secrets.UE_SOURCE_PAT }}
+        run: |
+          VERSION="${{ inputs.ue_version }}"
+          if [ -n "${{ inputs.ue_tag }}" ]; then
+            TAG="${{ inputs.ue_tag }}"
+          elif echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            # Patch version (e.g. 5.7.3) -> use exact tag
+            TAG="${VERSION}-release"
+          else
+            # Major.minor (e.g. 5.7) -> find latest release tag
+            TAG=$(GH_TOKEN="$UE_PAT" gh api repos/EpicGames/UnrealEngine/tags \
+              --paginate -q '.[].name' \
+              | grep -E "^${VERSION}\.[0-9]+-release$" \
+              | sort -V | tail -1)
+            if [ -z "$TAG" ]; then
+              echo "::error::No release tag found for UE ${VERSION}"
+              exit 1
+            fi
+          fi
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag: $TAG"
+
+      - name: Sparse checkout UE headers
+        run: |
+          echo "::group::Cloning EpicGames/UnrealEngine (tag: ${{ steps.tag.outputs.name }})"
+          git clone --no-checkout --depth 1 --filter=blob:none \
+            --branch "${{ steps.tag.outputs.name }}" \
+            "https://x-access-token:${{ secrets.UE_SOURCE_PAT }}@github.com/EpicGames/UnrealEngine.git" \
+            ue-source
+          cd ue-source
+          git sparse-checkout init --cone
+          git sparse-checkout set \
+            Engine/Source/Runtime \
+            Engine/Source/Editor \
+            Engine/Source/Developer \
+            Engine/Plugins
+          git checkout
+          echo "::endgroup::"
+          echo "Checkout size: $(du -sh . | cut -f1)"
+          echo "Disk free: $(df -h . | tail -1 | awk '{print $4}')"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install package
+        run: pip install .
+
+      - name: Build database
+        run: |
+          python -m unreal_api_mcp.ingest \
+            --unreal-version "${{ inputs.ue_version }}" \
+            --unreal-install ./ue-source \
+            --output "./unreal_docs_${{ inputs.ue_version }}.db"
+
+      - name: Show results
+        run: |
+          DB="./unreal_docs_${{ inputs.ue_version }}.db"
+          echo "Database: $DB"
+          echo "Size: $(du -h "$DB" | cut -f1)"
+          echo "Record count: $(sqlite3 "$DB" 'SELECT COUNT(*) FROM entries;')"
+
+      - name: Ensure release exists
+        run: |
+          gh release view db-v1 2>/dev/null || \
+            gh release create db-v1 --title "Database files" \
+              --notes "Pre-built SQLite databases for each UE version. Downloaded automatically on first run."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload to release
+        run: |
+          gh release upload db-v1 \
+            "./unreal_docs_${{ inputs.ue_version }}.db" \
+            --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

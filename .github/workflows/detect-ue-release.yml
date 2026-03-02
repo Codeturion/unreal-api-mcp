@@ -27,9 +27,13 @@ jobs:
 
           # Extract unique major.minor versions from release tags (e.g. 5.7.3-release -> 5.7)
           ue_versions=$(echo "$all_tags" \
-            | grep -oP '^\d+\.\d+' \
+            | grep -oE '^[0-9]+\.[0-9]+' \
             | sort -Vu)
           echo "UE versions found: $ue_versions"
+
+          # Fetch existing DB assets once (not per iteration)
+          existing=$(gh release view db-v1 --json assets -q '.assets[].name' 2>/dev/null || echo "")
+          echo "Existing DBs: $existing"
 
           # For each version, find the latest release tag
           for version in $ue_versions; do
@@ -43,9 +47,7 @@ jobs:
               continue
             fi
 
-            # Check if we already have a DB for this version
             db_name="unreal_docs_${version}.db"
-            existing=$(gh release view db-v1 --json assets -q '.assets[].name' 2>/dev/null || echo "")
 
             if echo "$existing" | grep -qF "$db_name"; then
               echo "  $version: OK ($db_name exists, latest tag: $latest_tag)"
@@ -70,7 +72,7 @@ jobs:
           4. Leave \`ue_tag\` empty (auto-detects \`$latest_tag\`)
 
           **After the DB is built:**
-          - Update \`_SUPPORTED_VERSIONS\` in \`src/unreal_api_mcp/version.py\`
+          - Update \`_DEFAULT_VERSION\` in \`src/unreal_api_mcp/version.py\` if this is the new latest
           - Update README coverage table
           - Bump version and publish
           EOF

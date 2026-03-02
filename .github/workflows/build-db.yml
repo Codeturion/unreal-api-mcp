@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       ue_version:
-        description: "UE version to build (e.g. 5.5, 5.6, 5.7)"
+        description: "UE version to build (e.g. 5.5, 5.6, 5.7, 5.7.3)"
         required: true
         type: string
       ue_tag:
@@ -86,7 +86,13 @@ jobs:
           DB="./unreal_docs_${{ inputs.ue_version }}.db"
           echo "Database: $DB"
           echo "Size: $(du -h "$DB" | cut -f1)"
-          echo "Record count: $(sqlite3 "$DB" 'SELECT COUNT(*) FROM entries;')"
+          python -c "
+          import sqlite3
+          conn = sqlite3.connect('$DB')
+          count = conn.execute('SELECT COUNT(*) FROM entries').fetchone()[0]
+          print(f'Record count: {count}')
+          conn.close()
+          "
 
       - name: Ensure release exists
         run: |

@@ -16,7 +16,7 @@ jobs:
           versions=$(gh release view db-v1 \
             --repo "${{ github.repository }}" \
             --json assets -q '.assets[].name' \
-            | grep -oP 'unreal_docs_\K[0-9.]+(?=\.db$)' \
+            | grep -oE 'unreal_docs_[0-9.]+\.db$' | sed 's/unreal_docs_//;s/\.db//' \
             | sort -V \
             | jq -R . | jq -sc .)
           echo "versions=$versions" >> "$GITHUB_OUTPUT"
@@ -96,7 +96,13 @@ jobs:
           DB="./unreal_docs_${{ matrix.version }}.db"
           echo "Database: $DB"
           echo "Size: $(du -h "$DB" | cut -f1)"
-          echo "Record count: $(sqlite3 "$DB" 'SELECT COUNT(*) FROM entries;')"
+          python -c "
+          import sqlite3
+          conn = sqlite3.connect('$DB')
+          count = conn.execute('SELECT COUNT(*) FROM entries').fetchone()[0]
+          print(f'Record count: {count}')
+          conn.close()
+          "
 
       - name: Upload to release
         run: |

@@ -16,6 +16,7 @@ _GITHUB_RELEASE = (
 )
 _DEFAULT_VERSION = "5.7"
 _UPDATE_CHECK_TIMEOUT = 3  # seconds
+_DOWNLOAD_TIMEOUT = 60  # seconds per socket operation
 
 
 def detect_version() -> str:
@@ -59,12 +60,12 @@ def _normalize_version(raw: str) -> str | None:
     Returns ``"5.7"`` or ``"5.7.3"`` (at most major.minor.patch).
     """
     raw = raw.strip()
-    m = re.match(r"^(\d+\.\d+)(?:\.(\d+))?", raw)
+    m = re.fullmatch(r"(\d+)\.(\d+)(?:\.(\d+))?(?:\.\d+)*", raw)
     if not m:
         return None
-    if m.group(2):
-        return f"{m.group(1)}.{m.group(2)}"
-    return m.group(1)
+    if m.group(3):
+        return f"{m.group(1)}.{m.group(2)}.{m.group(3)}"
+    return f"{m.group(1)}.{m.group(2)}"
 
 
 def _db_candidates(version: str) -> list[str]:
@@ -78,6 +79,18 @@ def _db_candidates(version: str) -> list[str]:
     if m:
         candidates.append(m.group(1))
     return candidates
+
+
+def _download(url: str, dest: Path, timeout: int = _DOWNLOAD_TIMEOUT) -> None:
+    """Download a URL to a local file with a per-operation timeout."""
+    req = urllib.request.Request(url)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with open(dest, "wb") as f:
+            while True:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                f.write(chunk)
 
 
 def db_path(version: str | None = None) -> Path:
@@ -120,10 +133,15 @@ def _check_for_update(local_path: Path, version: str) -> None:
             file=sys.stderr,
         )
         tmp = local_path.with_suffix(".db.tmp")
-        urllib.request.urlretrieve(url, str(tmp))
-        tmp.rename(local_path)
-        size_mb = local_path.stat().st_size / 1024 / 1024
-        print(f"  Updated -> {local_path} ({size_mb:.1f} MB)", file=sys.stderr)
+        try:
+            _download(url, tmp)
+            tmp.replace(local_path)
+            size_mb = local_path.stat().st_size / 1024 / 1024
+            print(
+                f"  Updated -> {local_path} ({size_mb:.1f} MB)", file=sys.stderr
+            )
+        except Exception:
+            tmp.unlink(missing_ok=True)
     except Exception:
         pass
 
@@ -157,8 +175,8 @@ def ensure_db(version: str | None = None) -> Path:
 
         tmp = path.with_suffix(".db.tmp")
         try:
-            urllib.request.urlretrieve(url, str(tmp))
-            tmp.rename(path)
+            _download(url, tmp)
+            tmp.replace(path)
             size_mb = path.stat().st_size / 1024 / 1024
             print(f"  Downloaded {size_mb:.1f} MB -> {path}", file=sys.stderr)
             return path

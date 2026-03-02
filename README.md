@@ -12,7 +12,7 @@
 
 **MCP server that gives AI agents accurate Unreal Engine C++ API documentation. Saves tokens, context, and time — prevents hallucinated signatures, wrong `#include` paths, and deprecated API usage.**
 
-Supports **every UE 5.x release** (5.0 through 5.7) with separate databases for each version and patch. Works with Claude Code, Cursor, Windsurf, or any MCP-compatible AI tool. No Unreal Engine installation required. New versions detected and built automatically every week.
+Works with Claude Code, Cursor, Windsurf, or any MCP-compatible AI tool. No Unreal Engine installation required. Check the [supported versions](https://github.com/Codeturion/unreal-api-mcp/releases/tag/db-v1). New versions are detected and built automatically every week.
 
 ## Quick Start
 
@@ -32,9 +32,9 @@ Add to your MCP config (`.mcp.json`, `mcp.json`, or your tool's MCP settings), s
 }
 ```
 
-Valid values: `"5.0"` through `"5.7"`, or any patch version like `"5.7.3"`.
+Set this to match your project's UE version. See [supported versions](https://github.com/Codeturion/unreal-api-mcp/releases/tag/db-v1) for all available databases.
 
-On first run the server downloads the correct database (~26-50 MB depending on version) to `~/.unreal-api-mcp/`. Patch versions (e.g. `"5.7.3"`) fall back to the major.minor database (e.g. `"5.7"`) if a patch-specific one isn't available.
+On first run the server downloads the correct database to `~/.unreal-api-mcp/`. Patch versions (e.g. `"5.7.3"`) fall back to the major.minor database (e.g. `"5.7"`) if a patch-specific one isn't available.
 
 ## How It Works
 
@@ -44,7 +44,8 @@ On first run the server downloads the correct database (~26-50 MB depending on v
 |----------|--------|---------|
 | 1 | `UNREAL_VERSION` env var | `"5.5"`, `"5.7"`, `"5.7.3"` |
 | 2 | `UNREAL_PROJECT_PATH` | Reads `.uproject` `EngineAssociation` field (e.g. `5.5.1` or `5.7`) |
-| 3 | Default | `"5.7"` |
+
+Set one of these to match your project. Without either, the server defaults to UE 5.7.
 
 2. **Database download.** If the database for that version isn't cached locally, it downloads from GitHub (one time). For patch versions, falls back to the major.minor database if needed. Also checks for updates on startup.
 

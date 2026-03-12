@@ -157,11 +157,21 @@ _SLATE_NAMED_SLOT_RE = re.compile(
     r"\bSLATE_NAMED_SLOT\s*\(\s*([\w:< >*&,]+?)\s*,\s*(\w+)\s*\)"
 )
 
-# class [API] SWidgetName : public SBase — Slate class declaration
-_SLATE_CLASS_DECL_RE = re.compile(
-    r"\bclass\s+(?:\w+_API\s+)?(S\w+)"
-    r"(?:\s*:\s*(?:(?:public|protected|private)\s+)?(S[\w:]+))?"
+# Generic class declaration — used to pre-scan all classes in a file once,
+# avoiding per-class re.compile() calls inside loops.
+_ANY_CLASS_DECL_RE = re.compile(
+    r"\bclass\s+(?:\w+_API\s+)?(\w+)"
+    r"(?:\s*:\s*(?:(?:public|protected|private)\s+)?([\w:]+))?"
 )
+
+# Describes how each Slate slot macro maps to a record type.
+# (compiled_pattern, member_type, macro_type, wrap_in_tattribute)
+_SLATE_SLOT_MACROS: list[tuple[re.Pattern[str], str, str, bool]] = [
+    (_SLATE_ATTRIBUTE_RE, "property",  "SLATE_ATTRIBUTE",  True),
+    (_SLATE_EVENT_RE,     "delegate",  "SLATE_EVENT",      False),
+    (_SLATE_ARGUMENT_RE,  "property",  "SLATE_ARGUMENT",   False),
+    (_SLATE_NAMED_SLOT_RE,"property",  "SLATE_NAMED_SLOT", False),
+]
 
 
 # ---------------------------------------------------------------------------
@@ -574,6 +584,36 @@ def parse_header(
 # ---------------------------------------------------------------------------
 
 
+def _scan_class_declarations(source: str) -> list[tuple[str, str, int]]:
+    """Pre-scan all class declarations in *source* once.
+
+    Returns a list of (class_name, base_class, position) sorted by position.
+    Used to avoid compiling per-class regexes inside loops.
+    """
+    return [
+        (m.group(1), m.group(2) or "", m.start())
+        for m in _ANY_CLASS_DECL_RE.finditer(source)
+    ]
+
+
+def _find_class_decl(
+    class_decls: list[tuple[str, str, int]],
+    class_name: str,
+    before_pos: int,
+) -> tuple[str, int] | None:
+    """Find the last declaration of *class_name* before *before_pos*.
+
+    Returns (base_class, position) or None if not found.
+    """
+    result = None
+    for name, base, pos in class_decls:
+        if pos >= before_pos:
+            break
+        if name == class_name:
+            result = (base, pos)
+    return result
+
+
 def _parse_slate_classes(
     source: str,
     *,
@@ -587,23 +627,16 @@ def _parse_slate_classes(
     """
     records: list[dict[str, Any]] = []
 
+    # Pre-scan all class declarations once to avoid re.compile() inside the loop.
+    class_decls = _scan_class_declarations(source)
+
     for begin_m in _SLATE_BEGIN_ARGS_RE.finditer(source):
         class_name = begin_m.group(1)
 
-        # Find the class declaration by scanning backwards
-        before = source[: begin_m.start()]
-        class_decl_pattern = re.compile(
-            rf"\bclass\s+(?:\w+_API\s+)?{re.escape(class_name)}\b"
-            rf"(?:\s*:\s*(?:(?:public|protected|private)\s+)?(S[\w:]+))?"
-        )
-        base_class = ""
-        class_start = begin_m.start()
-        last_match = None
-        for m in class_decl_pattern.finditer(before):
-            last_match = m
-        if last_match:
-            class_start = last_match.start()
-            base_class = last_match.group(1) or ""
+        # Look up the nearest preceding class declaration without recompiling.
+        decl = _find_class_decl(class_decls, class_name, begin_m.start())
+        base_class = decl[0] if decl else ""
+        class_start = decl[1] if decl else begin_m.start()
 
         comment = _find_preceding_comment(source, class_start)
         summary = _extract_summary(comment)
@@ -629,89 +662,28 @@ def _parse_slate_classes(
         args_region_end = end_m.end() if end_m else len(source)
         args_region = source[begin_m.start(): args_region_end]
 
-        # SLATE_ATTRIBUTE — animatable attribute (e.g. Text, Color)
-        for attr_m in _SLATE_ATTRIBUTE_RE.finditer(args_region):
-            attr_type = attr_m.group(1).strip()
-            attr_name = attr_m.group(2)
-            attr_comment = _find_preceding_comment(args_region, attr_m.start())
-            records.append({
-                "fqn": f"{class_name}::{attr_name}",
-                "module": module,
-                "class_name": class_name,
-                "member_name": attr_name,
-                "member_type": "property",
-                "summary": _extract_summary(attr_comment),
-                "params_json": "[]",
-                "return_type": f"TAttribute<{attr_type}>",
-                "include_path": include_path,
-                "deprecated": 0,
-                "deprecation_hint": "",
-                "specifiers": "SLATE_ATTRIBUTE",
-                "macro_type": "SLATE_ATTRIBUTE",
-            })
-
-        # SLATE_EVENT — event/callback slot (e.g. OnClicked, OnHovered)
-        for evt_m in _SLATE_EVENT_RE.finditer(args_region):
-            evt_type = evt_m.group(1).strip()
-            evt_name = evt_m.group(2)
-            evt_comment = _find_preceding_comment(args_region, evt_m.start())
-            records.append({
-                "fqn": f"{class_name}::{evt_name}",
-                "module": module,
-                "class_name": class_name,
-                "member_name": evt_name,
-                "member_type": "delegate",
-                "summary": _extract_summary(evt_comment),
-                "params_json": "[]",
-                "return_type": evt_type,
-                "include_path": include_path,
-                "deprecated": 0,
-                "deprecation_hint": "",
-                "specifiers": "SLATE_EVENT",
-                "macro_type": "SLATE_EVENT",
-            })
-
-        # SLATE_ARGUMENT — plain constructor argument (e.g. bIsEnabled)
-        for arg_m in _SLATE_ARGUMENT_RE.finditer(args_region):
-            arg_type = arg_m.group(1).strip()
-            arg_name = arg_m.group(2)
-            arg_comment = _find_preceding_comment(args_region, arg_m.start())
-            records.append({
-                "fqn": f"{class_name}::{arg_name}",
-                "module": module,
-                "class_name": class_name,
-                "member_name": arg_name,
-                "member_type": "property",
-                "summary": _extract_summary(arg_comment),
-                "params_json": "[]",
-                "return_type": arg_type,
-                "include_path": include_path,
-                "deprecated": 0,
-                "deprecation_hint": "",
-                "specifiers": "SLATE_ARGUMENT",
-                "macro_type": "SLATE_ARGUMENT",
-            })
-
-        # SLATE_NAMED_SLOT — named content slot (e.g. Content, Header)
-        for slot_m in _SLATE_NAMED_SLOT_RE.finditer(args_region):
-            slot_type = slot_m.group(1).strip()
-            slot_name = slot_m.group(2)
-            slot_comment = _find_preceding_comment(args_region, slot_m.start())
-            records.append({
-                "fqn": f"{class_name}::{slot_name}",
-                "module": module,
-                "class_name": class_name,
-                "member_name": slot_name,
-                "member_type": "property",
-                "summary": _extract_summary(slot_comment),
-                "params_json": "[]",
-                "return_type": slot_type,
-                "include_path": include_path,
-                "deprecated": 0,
-                "deprecation_hint": "",
-                "specifiers": "SLATE_NAMED_SLOT",
-                "macro_type": "SLATE_NAMED_SLOT",
-            })
+        # Emit a record for every slot macro using the shared table.
+        for pattern, member_type, macro_type, wrap_tattribute in _SLATE_SLOT_MACROS:
+            for slot_m in pattern.finditer(args_region):
+                raw_type = slot_m.group(1).strip()
+                member_name = slot_m.group(2)
+                slot_comment = _find_preceding_comment(args_region, slot_m.start())
+                return_type = f"TAttribute<{raw_type}>" if wrap_tattribute else raw_type
+                records.append({
+                    "fqn": f"{class_name}::{member_name}",
+                    "module": module,
+                    "class_name": class_name,
+                    "member_name": member_name,
+                    "member_type": member_type,
+                    "summary": _extract_summary(slot_comment),
+                    "params_json": "[]",
+                    "return_type": return_type,
+                    "include_path": include_path,
+                    "deprecated": 0,
+                    "deprecation_hint": "",
+                    "specifiers": macro_type,
+                    "macro_type": macro_type,
+                })
 
     return records
 
@@ -738,21 +710,17 @@ def _build_class_regions(source: str) -> list[tuple[str, int, int]]:
             if m:
                 entries.append((m.group(1), start))
 
-    # Detect Slate widget classes from SLATE_BEGIN_ARGS
+    # Detect Slate widget classes from SLATE_BEGIN_ARGS.
+    # Pre-scan all class declarations once to avoid re.compile() per widget.
+    class_decls = _scan_class_declarations(source)
     seen_slate: set[str] = set()
     for m in _SLATE_BEGIN_ARGS_RE.finditer(source):
         class_name = m.group(1)
         if class_name in seen_slate:
             continue
         seen_slate.add(class_name)
-        before = source[: m.start()]
-        class_decl = re.compile(
-            rf"\bclass\s+(?:\w+_API\s+)?{re.escape(class_name)}\b"
-        )
-        last = None
-        for cm in class_decl.finditer(before):
-            last = cm
-        entries.append((class_name, last.start() if last else m.start()))
+        decl = _find_class_decl(class_decls, class_name, m.start())
+        entries.append((class_name, decl[1] if decl else m.start()))
 
     entries.sort(key=lambda x: x[1])
 

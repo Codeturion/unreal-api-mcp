@@ -2,6 +2,8 @@
 
 Extracts UCLASS, USTRUCT, UENUM, UFUNCTION, and UPROPERTY declarations
 along with their Doxygen doc comments, specifiers, and deprecation info.
+Also supports Slate widget macros: SLATE_BEGIN_ARGS, SLATE_ATTRIBUTE,
+SLATE_EVENT, SLATE_ARGUMENT, and SLATE_NAMED_SLOT.
 """
 
 from __future__ import annotations
@@ -123,6 +125,42 @@ _DELEGATE_DECL = re.compile(
     r"(DECLARE_(?:DYNAMIC_MULTICAST_|DYNAMIC_|MULTICAST_)?DELEGATE"
     r"(?:_\w+)?)\s*\("
     r"([^)]+)\)",
+)
+
+# ---------------------------------------------------------------------------
+# Slate widget macro patterns
+# ---------------------------------------------------------------------------
+
+# SLATE_BEGIN_ARGS(ClassName)
+_SLATE_BEGIN_ARGS_RE = re.compile(r"\bSLATE_BEGIN_ARGS\s*\(\s*(\w+)\s*\)")
+
+# SLATE_END_ARGS()
+_SLATE_END_ARGS_RE = re.compile(r"\bSLATE_END_ARGS\s*\(\s*\)")
+
+# SLATE_ATTRIBUTE(Type, Name)  — attribute that supports TAttribute animation
+_SLATE_ATTRIBUTE_RE = re.compile(
+    r"\bSLATE_ATTRIBUTE\s*\(\s*([\w:< >*&,]+?)\s*,\s*(\w+)\s*\)"
+)
+
+# SLATE_EVENT(DelegateType, Name)  — event callback slot
+_SLATE_EVENT_RE = re.compile(
+    r"\bSLATE_EVENT\s*\(\s*([\w:< >*&,]+?)\s*,\s*(\w+)\s*\)"
+)
+
+# SLATE_ARGUMENT(Type, Name)  — plain constructor argument (not animatable)
+_SLATE_ARGUMENT_RE = re.compile(
+    r"\bSLATE_ARGUMENT\s*\(\s*([\w:< >*&,]+?)\s*,\s*(\w+)\s*\)"
+)
+
+# SLATE_NAMED_SLOT(Type, Name)  — named widget content slot
+_SLATE_NAMED_SLOT_RE = re.compile(
+    r"\bSLATE_NAMED_SLOT\s*\(\s*([\w:< >*&,]+?)\s*,\s*(\w+)\s*\)"
+)
+
+# class [API] SWidgetName : public SBase — Slate class declaration
+_SLATE_CLASS_DECL_RE = re.compile(
+    r"\bclass\s+(?:\w+_API\s+)?(S\w+)"
+    r"(?:\s*:\s*(?:(?:public|protected|private)\s+)?(S[\w:]+))?"
 )
 
 
@@ -523,6 +561,158 @@ def parse_header(
             "macro_type": macro_name,
         })
 
+    # --- Slate widget classes -------------------------------------------
+    records.extend(
+        _parse_slate_classes(source, module=module, include_path=include_path)
+    )
+
+    return records
+
+
+# ---------------------------------------------------------------------------
+# Slate widget parsing
+# ---------------------------------------------------------------------------
+
+
+def _parse_slate_classes(
+    source: str,
+    *,
+    module: str = "",
+    include_path: str = "",
+) -> list[dict[str, Any]]:
+    """Parse Slate widget classes using SLATE_BEGIN_ARGS and related macros.
+
+    Extracts class records for SWidget subclasses and their attributes,
+    events, arguments, and named slots declared via Slate macros.
+    """
+    records: list[dict[str, Any]] = []
+
+    for begin_m in _SLATE_BEGIN_ARGS_RE.finditer(source):
+        class_name = begin_m.group(1)
+
+        # Find the class declaration by scanning backwards
+        before = source[: begin_m.start()]
+        class_decl_pattern = re.compile(
+            rf"\bclass\s+(?:\w+_API\s+)?{re.escape(class_name)}\b"
+            rf"(?:\s*:\s*(?:(?:public|protected|private)\s+)?(S[\w:]+))?"
+        )
+        base_class = ""
+        class_start = begin_m.start()
+        last_match = None
+        for m in class_decl_pattern.finditer(before):
+            last_match = m
+        if last_match:
+            class_start = last_match.start()
+            base_class = last_match.group(1) or ""
+
+        comment = _find_preceding_comment(source, class_start)
+        summary = _extract_summary(comment)
+
+        records.append({
+            "fqn": class_name,
+            "module": module,
+            "class_name": class_name,
+            "member_name": class_name,
+            "member_type": "class",
+            "summary": summary,
+            "params_json": json.dumps([{"name": "Parent", "type": base_class}]) if base_class else "[]",
+            "return_type": base_class,
+            "include_path": include_path,
+            "deprecated": 0,
+            "deprecation_hint": "",
+            "specifiers": "",
+            "macro_type": "SLATE_CLASS",
+        })
+
+        # Bound the args region: from SLATE_BEGIN_ARGS to SLATE_END_ARGS
+        end_m = _SLATE_END_ARGS_RE.search(source, begin_m.start())
+        args_region_end = end_m.end() if end_m else len(source)
+        args_region = source[begin_m.start(): args_region_end]
+
+        # SLATE_ATTRIBUTE — animatable attribute (e.g. Text, Color)
+        for attr_m in _SLATE_ATTRIBUTE_RE.finditer(args_region):
+            attr_type = attr_m.group(1).strip()
+            attr_name = attr_m.group(2)
+            attr_comment = _find_preceding_comment(args_region, attr_m.start())
+            records.append({
+                "fqn": f"{class_name}::{attr_name}",
+                "module": module,
+                "class_name": class_name,
+                "member_name": attr_name,
+                "member_type": "property",
+                "summary": _extract_summary(attr_comment),
+                "params_json": "[]",
+                "return_type": f"TAttribute<{attr_type}>",
+                "include_path": include_path,
+                "deprecated": 0,
+                "deprecation_hint": "",
+                "specifiers": "SLATE_ATTRIBUTE",
+                "macro_type": "SLATE_ATTRIBUTE",
+            })
+
+        # SLATE_EVENT — event/callback slot (e.g. OnClicked, OnHovered)
+        for evt_m in _SLATE_EVENT_RE.finditer(args_region):
+            evt_type = evt_m.group(1).strip()
+            evt_name = evt_m.group(2)
+            evt_comment = _find_preceding_comment(args_region, evt_m.start())
+            records.append({
+                "fqn": f"{class_name}::{evt_name}",
+                "module": module,
+                "class_name": class_name,
+                "member_name": evt_name,
+                "member_type": "delegate",
+                "summary": _extract_summary(evt_comment),
+                "params_json": "[]",
+                "return_type": evt_type,
+                "include_path": include_path,
+                "deprecated": 0,
+                "deprecation_hint": "",
+                "specifiers": "SLATE_EVENT",
+                "macro_type": "SLATE_EVENT",
+            })
+
+        # SLATE_ARGUMENT — plain constructor argument (e.g. bIsEnabled)
+        for arg_m in _SLATE_ARGUMENT_RE.finditer(args_region):
+            arg_type = arg_m.group(1).strip()
+            arg_name = arg_m.group(2)
+            arg_comment = _find_preceding_comment(args_region, arg_m.start())
+            records.append({
+                "fqn": f"{class_name}::{arg_name}",
+                "module": module,
+                "class_name": class_name,
+                "member_name": arg_name,
+                "member_type": "property",
+                "summary": _extract_summary(arg_comment),
+                "params_json": "[]",
+                "return_type": arg_type,
+                "include_path": include_path,
+                "deprecated": 0,
+                "deprecation_hint": "",
+                "specifiers": "SLATE_ARGUMENT",
+                "macro_type": "SLATE_ARGUMENT",
+            })
+
+        # SLATE_NAMED_SLOT — named content slot (e.g. Content, Header)
+        for slot_m in _SLATE_NAMED_SLOT_RE.finditer(args_region):
+            slot_type = slot_m.group(1).strip()
+            slot_name = slot_m.group(2)
+            slot_comment = _find_preceding_comment(args_region, slot_m.start())
+            records.append({
+                "fqn": f"{class_name}::{slot_name}",
+                "module": module,
+                "class_name": class_name,
+                "member_name": slot_name,
+                "member_type": "property",
+                "summary": _extract_summary(slot_comment),
+                "params_json": "[]",
+                "return_type": slot_type,
+                "include_path": include_path,
+                "deprecated": 0,
+                "deprecation_hint": "",
+                "specifiers": "SLATE_NAMED_SLOT",
+                "macro_type": "SLATE_NAMED_SLOT",
+            })
+
     return records
 
 
@@ -536,6 +726,7 @@ def _build_class_regions(source: str) -> list[tuple[str, int, int]]:
 
     Returns list of (class_name, start, end) sorted by start position.
     Uses balanced-paren matching so nested ``meta=(...)`` won't break it.
+    Also detects Slate widget classes via SLATE_BEGIN_ARGS.
     """
     entries: list[tuple[str, int]] = []
 
@@ -546,6 +737,22 @@ def _build_class_regions(source: str) -> list[tuple[str, int, int]]:
             m = decl.match(after)
             if m:
                 entries.append((m.group(1), start))
+
+    # Detect Slate widget classes from SLATE_BEGIN_ARGS
+    seen_slate: set[str] = set()
+    for m in _SLATE_BEGIN_ARGS_RE.finditer(source):
+        class_name = m.group(1)
+        if class_name in seen_slate:
+            continue
+        seen_slate.add(class_name)
+        before = source[: m.start()]
+        class_decl = re.compile(
+            rf"\bclass\s+(?:\w+_API\s+)?{re.escape(class_name)}\b"
+        )
+        last = None
+        for cm in class_decl.finditer(before):
+            last = cm
+        entries.append((class_name, last.start() if last else m.start()))
 
     entries.sort(key=lambda x: x[1])
 
@@ -628,8 +835,11 @@ def parse_header_file(
     """Read and parse a single header file from disk."""
     source = path.read_text(encoding="utf-8", errors="replace")
 
-    # Quick check: skip files with no reflection macros.
-    if not re.search(r"\b(UCLASS|USTRUCT|UENUM|UFUNCTION|UPROPERTY)\s*\(", source):
+    # Quick check: skip files with no reflection or Slate macros.
+    if not re.search(
+        r"\b(UCLASS|USTRUCT|UENUM|UFUNCTION|UPROPERTY|SLATE_BEGIN_ARGS)\s*\(",
+        source,
+    ):
         return []
 
     return parse_header(source, module=module, include_path=include_path)

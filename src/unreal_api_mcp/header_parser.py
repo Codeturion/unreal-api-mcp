@@ -2,6 +2,8 @@
 
 Extracts UCLASS, USTRUCT, UENUM, UFUNCTION, and UPROPERTY declarations
 along with their Doxygen doc comments, specifiers, and deprecation info.
+Also parses plain C++ method declarations (without UFUNCTION) inside
+reflected classes to capture the full API surface.
 Also supports Slate widget macros: SLATE_BEGIN_ARGS, SLATE_ATTRIBUTE,
 SLATE_EVENT, SLATE_ARGUMENT, and SLATE_NAMED_SLOT.
 """
@@ -89,6 +91,37 @@ _FUNC_DECL = re.compile(
     r"\s*\(([^)]*)\)",
     re.DOTALL,
 )
+
+# Plain C++ method declaration — locates the signature start.
+# Balanced-paren matching is used at runtime for the parameter list to
+# handle nested parens in default values like FVector(1.f).
+# Captures: (keywords, keywords2, return_type, name)
+_PLAIN_METHOD_START_RE = re.compile(
+    r"^[ \t]*"
+    r"(?:\[\[[\w:]+\]\]\s*)?"  # optional C++ attributes like [[nodiscard]]
+    r"((?:(?:virtual|static|FORCEINLINE|explicit|inline|const|constexpr|CONSTEXPR)\s+)*)"
+    r"(?:\w+_API\s+)?"
+    r"((?:(?:virtual|static|FORCEINLINE|explicit|inline|const|constexpr|CONSTEXPR)\s+)*)"
+    r"(?:class\s+)?"
+    r"([\w:*&<>, ]+?)\s+"
+    r"(\w+)"
+    r"\s*\(",
+    re.MULTILINE,
+)
+
+# Names that are never methods — macros, keywords, common false positives.
+_NOT_A_METHOD = frozenset({
+    "if", "else", "for", "while", "switch", "case", "return", "do",
+    "sizeof", "alignof", "decltype", "static_assert", "static_cast",
+    "dynamic_cast", "const_cast", "reinterpret_cast", "new", "delete",
+    "throw", "catch", "try", "typedef", "using", "namespace",
+    "GENERATED_BODY", "GENERATED_UCLASS_BODY", "GENERATED_USTRUCT_BODY",
+    "UFUNCTION", "UPROPERTY", "UCLASS", "USTRUCT", "UENUM",
+    "DECLARE_DELEGATE", "DECLARE_DYNAMIC_DELEGATE",
+    "DECLARE_MULTICAST_DELEGATE", "DECLARE_DYNAMIC_MULTICAST_DELEGATE",
+    "DECLARE_EVENT", "check", "ensure", "verify", "checkf",
+    "UE_LOG", "UE_DEPRECATED",
+})
 
 # Type Name [:;=]
 _PROP_DECL = re.compile(
@@ -259,6 +292,35 @@ def _extract_return(comment: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _extract_balanced_params(source: str, open_pos: int) -> tuple[str, int] | None:
+    """Extract the text between balanced parentheses starting at *open_pos*.
+
+    Returns ``(content, close_pos)`` where *content* is the text between
+    ``(`` and ``)`` and *close_pos* is the index of the closing ``)``,
+    or ``None`` if the parentheses are unbalanced.
+    """
+    if open_pos >= len(source) or source[open_pos] != "(":
+        return None
+    depth = 1
+    i = open_pos + 1
+    while i < len(source) and depth > 0:
+        ch = source[i]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == '"':
+            i += 1
+            while i < len(source) and source[i] != '"':
+                if source[i] == "\\":
+                    i += 1
+                i += 1
+        i += 1
+    if depth != 0:
+        return None
+    return source[open_pos + 1: i - 1].strip(), i - 1
+
+
 def _parse_func_params(raw: str) -> list[dict[str, str]]:
     """Parse a C++ parameter list into structured params.
 
@@ -341,6 +403,26 @@ def _check_deprecation(source: str, pos: int, end: int) -> tuple[bool, str]:
         hint = dm.group(1) if dm else ""
         return True, hint
 
+    return False, ""
+
+
+def _check_plain_deprecation(source: str, pos: int, end: int) -> tuple[bool, str]:
+    """Check for UE_DEPRECATED on a plain (non-macro) declaration.
+
+    Uses a tighter backward window than ``_check_deprecation`` to avoid
+    matching deprecation markers from *preceding* declarations.  Only
+    looks at the two lines immediately above the declaration.
+    """
+    # Look back to the start of the line, plus one preceding line.
+    before_start = source[:pos].rfind("\n", 0, max(0, pos - 1))
+    if before_start > 0:
+        before_start = source[:before_start].rfind("\n", 0, before_start) + 1
+    else:
+        before_start = max(0, pos - 200)
+    region = source[before_start: end]
+    m = _UE_DEPRECATED.search(region)
+    if m:
+        return True, m.group(2)
     return False, ""
 
 
@@ -538,6 +620,119 @@ def parse_header(
             "specifiers": specifiers,
             "macro_type": "UPROPERTY",
         })
+
+    # --- Plain C++ methods (no UFUNCTION macro) -------------------------
+    # Collect byte positions already covered by UFUNCTION records so we
+    # don't emit duplicates.
+    ufunction_ranges: list[tuple[int, int]] = []
+    for start, end, _ in _find_macro_occurrences(source, "UFUNCTION"):
+        after = source[end:]
+        m = _FUNC_DECL.match(after)
+        decl_end = end + m.end() if m else end + 200
+        ufunction_ranges.append((start, min(decl_end, len(source))))
+
+    for name, region_start, region_end in class_regions:
+        region = source[region_start:region_end]
+        for m in _PLAIN_METHOD_START_RE.finditer(region):
+            abs_pos = region_start + m.start()
+
+            # Skip if this overlaps a UFUNCTION declaration.
+            if any(s <= abs_pos < e for s, e in ufunction_ranges):
+                continue
+
+            func_name = m.group(4)
+
+            # Skip non-method matches.
+            if func_name in _NOT_A_METHOD:
+                continue
+            if func_name.startswith("DECLARE_"):
+                continue
+            # Skip constructors/destructors.
+            if func_name == name or func_name == f"~{name}":
+                continue
+            # Skip operator overloads.
+            if func_name.startswith("operator"):
+                continue
+
+            keywords = ((m.group(1) or "") + (m.group(2) or "")).strip()
+            return_type = m.group(3).strip()
+
+            # Return type sanity — skip if it looks like a macro or keyword,
+            # or starts with one (e.g. "friend void").
+            first_word = return_type.split()[0] if return_type else ""
+            if first_word in ("class", "struct", "enum", "friend",
+                              "typedef", "using", "namespace"):
+                continue
+
+            # Strip constexpr from return type (captured as keyword but
+            # the lazy regex can leave it in the return type group).
+            return_type = re.sub(r"\bconstexpr\s*", "", return_type).strip()
+            if not return_type:
+                continue
+
+            # Check if the opening paren is inside angle brackets (template
+            # args like TFunction<void(int32)>). Count unmatched < vs >
+            # from the start of the match to the opening paren.
+            match_text = m.group(0)
+            angle_depth = 0
+            for ch in match_text:
+                if ch == "<":
+                    angle_depth += 1
+                elif ch == ">":
+                    angle_depth -= 1
+            if angle_depth > 0:
+                continue
+
+            # Balanced-paren matching for the parameter list (handles
+            # nested parens in default values like FVector(1.f)).
+            open_pos = region_start + m.end() - 1  # position of '('
+            result = _extract_balanced_params(source, open_pos)
+            if result is None:
+                continue
+            raw_params, close_pos = result
+
+            # Verify the declaration ends with ; or { after the closing paren.
+            trailing = source[close_pos + 1:close_pos + 201]
+            if not re.match(
+                r"\s*(?:const\s*)?(?:noexcept\s*)?(?:override\s*)?(?:final\s*)?"
+                r"(?:PURE_VIRTUAL\s*\([^)]*\)\s*)?(?:=\s*0\s*)?[;{]",
+                trailing,
+            ):
+                continue
+
+            return_type = re.sub(r"\bclass\s+", "", return_type)
+
+            fqn = f"{name}::{func_name}"
+
+            comment = _find_preceding_comment(source, abs_pos)
+            summary = _extract_summary(comment)
+            doc_params = _extract_params(comment)
+            doc_return = _extract_return(comment)
+
+            sig_params = _parse_func_params(raw_params)
+            params = _merge_params(sig_params, doc_params)
+
+            deprecated, dep_hint = _check_plain_deprecation(
+                source, abs_pos, close_pos + 1
+            )
+
+            is_virtual = "virtual" in keywords
+
+            records.append({
+                "fqn": fqn,
+                "module": module,
+                "class_name": name,
+                "member_name": func_name,
+                "member_type": "function",
+                "summary": summary,
+                "params_json": json.dumps(params),
+                "return_type": doc_return if doc_return else return_type,
+                "include_path": include_path,
+                "deprecated": int(deprecated),
+                "deprecation_hint": dep_hint,
+                "specifiers": "virtual" if is_virtual else "",
+                "macro_type": "",
+            })
 
     # --- DELEGATE declarations ------------------------------------------
     for m in _DELEGATE_DECL.finditer(source):

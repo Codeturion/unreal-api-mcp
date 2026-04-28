@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/codeturion-unreal-api-mcp-badge.png)](https://mseep.ai/app/codeturion-unreal-api-mcp)
+
 # unreal-api-mcp
 
 <!-- mcp-name: io.github.Codeturion/unreal-api-mcp -->

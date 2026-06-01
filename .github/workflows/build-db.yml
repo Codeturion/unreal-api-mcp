@@ -20,7 +20,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Resolve UE tag
         id: tag
@@ -67,7 +67,7 @@ jobs:
           echo "Disk free: $(df -h . | tail -1 | awk '{print $4}')"
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 

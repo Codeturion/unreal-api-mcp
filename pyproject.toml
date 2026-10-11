@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "unreal-api-mcp"
-version = "0.3.0"
+version = "0.3.1"
 description = "MCP server providing ground-truth Unreal Engine API documentation -- prevents AI hallucination of signatures, includes, and deprecated APIs"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -26,7 +26,7 @@ classifiers = [
     "Topic :: Games/Entertainment",
 ]
 dependencies = [
-    "mcp[cli]>=1.8.0",
+    "mcp[cli]>=1.8.0,<2",
     "python-dotenv>=1.0",
 ]
 

@@ -254,6 +254,7 @@ Databases are stored in `~/.unreal-api-mcp/` (downloaded on first run).
 | "Could not download UE X database" | Check internet connection. Or build locally: `python -m unreal_api_mcp.ingest --unreal-version 5.6 --unreal-install H:/UE_5.6` |
 | Wrong API version being served | Set `UNREAL_VERSION` explicitly. Check stderr: `unreal-api-mcp: serving UE <version>` |
 | Server won't start | Check `python --version` (needs 3.10+). Check path: `which unreal-api-mcp` or `where unreal-api-mcp` |
+| `ModuleNotFoundError: No module named 'mcp.server.fastmcp'` | Version 0.3.0 or older installed mcp 2.x. Restart your MCP client, or run `uvx unreal-api-mcp@latest`. With pip, run `pip install -U unreal-api-mcp`. |
 | Third-party plugins return no results | Marketplace/third-party plugins are not indexed. Only built-in Engine and Plugin APIs are covered. |
 
 ---

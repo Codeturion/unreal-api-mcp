@@ -12,12 +12,18 @@ on:
         required: false
         type: string
         default: ""
+      issue:
+        description: "Summary issue number from the detect workflow. Closed when all its versions are built."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write
     steps:
       - name: Checkout repo
         uses: actions/checkout@v5
@@ -166,3 +172,27 @@ jobs:
           *Last updated: ${updated}*
           EOF
           )"
+
+      - name: Close summary issue when all versions are built
+        if: inputs.issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ inputs.issue }}
+        run: |
+          state=$(gh issue view "$ISSUE" --json state -q .state)
+          [ "$state" = "OPEN" ] || { echo "Issue #$ISSUE is $state"; exit 0; }
+
+          versions=$(gh issue view "$ISSUE" --json body -q .body \
+            | grep -oE '^- `[0-9]+\.[0-9]+(\.[0-9]+)?`$' | tr -d '`- ')
+          assets=$(gh release view db-v1 --json assets -q '.assets[].name')
+
+          for v in $versions; do
+            if ! echo "$assets" | grep -qxF "unreal_docs_${v}.db"; then
+              echo "unreal_docs_${v}.db is not in db-v1 yet. Issue #$ISSUE stays open."
+              exit 0
+            fi
+          done
+
+          gh issue close "$ISSUE" --reason completed --comment \
+            "All versions in this issue are built and in the \`db-v1\` release. Closed by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            || true

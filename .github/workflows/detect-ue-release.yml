@@ -49,23 +49,19 @@ jobs:
             if echo "$existing" | grep -qF "$db_name"; then
               echo "  $version: OK ($db_name exists)"
             else
-              echo "  $version: NEW -- triggering build"
+              echo "  $version: NEW"
               new_versions="$new_versions $version"
-
-              # Trigger the Build UE Database workflow
-              gh workflow run build-db.yml \
-                -f ue_version="$version" \
-                -f ue_tag=""
             fi
           done
 
-          # Create a single summary issue if new versions were found
+          # Create a single summary issue, then trigger the builds.
+          # Each build closes the issue when all listed versions are in db-v1.
           if [ -n "$new_versions" ]; then
             version_list=$(echo "$new_versions" | tr ' ' '\n' | sed '/^$/d' | sort -V)
             count=$(echo "$version_list" | wc -l)
             formatted=$(echo "$version_list" | sed 's/^/- `/' | sed 's/$/`/')
 
-            gh issue create \
+            issue_url=$(gh issue create \
               --title "Auto-building $count new UE database(s)" \
               --body "$(cat <<EOF
           The weekly detect workflow found new Unreal Engine versions without databases.
@@ -79,9 +75,20 @@ jobs:
           - If a new major.minor was added, update \`_DEFAULT_VERSION\` in \`version.py\`
           - Update the README coverage table
           - Bump the package version and publish
+
+          This issue closes automatically when every version above is in \`db-v1\`.
           EOF
-            )"
-            echo "Created summary issue for $count new version(s)"
+            )") || issue_url=""
+            issue="${issue_url##*/}"
+            echo "Summary issue: ${issue_url:-none (create failed)}"
+
+            for version in $version_list; do
+              echo "  $version: triggering build"
+              gh workflow run build-db.yml \
+                -f ue_version="$version" \
+                -f ue_tag="" \
+                -f issue="$issue"
+            done
           else
             echo "No new versions found."
           fi

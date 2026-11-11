@@ -17,6 +17,17 @@ Works with Claude Code, Cursor, Windsurf, or any MCP-compatible AI tool. No Unre
 
 ## Quick Start
 
+**Automatic client configuration** (requires Node.js 18+ and [`uv`](https://docs.astral.sh/uv/getting-started/installation/)): set `UNREAL_VERSION` in the command to match your project, then run:
+
+```bash
+npx -y agent-add --global --mcp '{"unreal-api":{"command":"uvx","args":["unreal-api-mcp"],"env":{"UNREAL_VERSION":"5.5"}}}'
+```
+
+Select your client in [Agent Add](https://github.com/pea3nut/agent-add), for example Claude Code, Cursor, Windsurf, or Codex. It writes the user-level MCP configuration. Restart your client afterward.
+
+<details>
+<summary>Manual MCP configuration</summary>
+
 Add to your MCP config (`.mcp.json`, `mcp.json`, or your tool's MCP settings), setting `UNREAL_VERSION` to match your project:
 
 ```json
@@ -32,6 +43,8 @@ Add to your MCP config (`.mcp.json`, `mcp.json`, or your tool's MCP settings), s
   }
 }
 ```
+
+</details>
 
 Set this to match your project's UE version. See [supported versions](https://github.com/Codeturion/unreal-api-mcp/releases/tag/db-v1) for all available databases.
 
